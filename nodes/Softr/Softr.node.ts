@@ -7,6 +7,8 @@ import {
 	IRequestOptions,
 	NodeApiError,
 	NodeConnectionType,
+	ResourceMapperField,
+	ResourceMapperFields,
 } from 'n8n-workflow';
 import { getDatabases, getTables, SOFTR_STUDIO_USERS, SOFTR_TABLES } from './softr.helpers';
 
@@ -179,42 +181,38 @@ export class Softr implements INodeType {
 			{
 				displayName: 'Fields',
 				name: 'fields',
-				type: 'fixedCollection',
-				description: 'Fields to set for the record',
-				typeOptions: {
-					multipleValues: true,
-				},
+				type: 'resourceMapper',
 				default: {},
-				options: [
-					{
-						name: 'fields',
-						displayName: 'Field',
-						values: [
-							{
-								displayName: 'Key Name or ID',
-								name: 'key',
-								type: 'options',
-								description:
-									'Choose from the list, or specify an ID using an <a href="https://docs.n8n.io/code/expressions/">expression</a>',
-								typeOptions: {
-									loadOptionsMethod: 'getTableFields',
-									loadOptionsDependsOn: ['databaseId', 'tableId'],
-								},
-								default: '',
-							},
-							{
-								displayName: 'Value',
-								name: 'value',
-								type: 'string',
-								default: '',
-							},
-						],
+				typeOptions: {
+					loadOptionsDependsOn: ['databaseId', 'tableId'],
+					resourceMapper: {
+						mode: 'add',
+						resourceMapperMethod: 'getColumns',
 					},
-				],
+				},
 				displayOptions: {
 					show: {
 						resource: ['database'],
-						operation: ['create', 'update'],
+						operation: ['create'],
+					},
+				},
+			},
+			{
+				displayName: 'Fields',
+				name: 'fields',
+				type: 'resourceMapper',
+				default: {},
+				typeOptions: {
+					loadOptionsDependsOn: ['databaseId', 'tableId'],
+					resourceMapper: {
+						mode: 'map',
+						resourceMapperMethod: 'getColumns',
+					},
+				},
+				displayOptions: {
+					show: {
+						resource: ['database'],
+						operation: ['update'],
 					},
 				},
 			},
@@ -418,6 +416,12 @@ export class Softr implements INodeType {
 	};
 
 	methods = {
+		resourceMapping: {
+			async getColumns(this: ILoadOptionsFunctions): Promise<ResourceMapperFields> {
+				return getColumns.call(this);
+			},
+		},
+
 		loadOptions: {
 			async getDatabases(this: ILoadOptionsFunctions) {
 				return getDatabases.call(this);
@@ -468,7 +472,7 @@ export class Softr implements INodeType {
 		const resource = this.getNodeParameter('resource', 0, null) as string;
 		const operation = this.getNodeParameter('operation', 0, null) as string;
 
-		if(!resource || !operation) {
+		if (!resource || !operation) {
 			return [];
 		}
 
@@ -477,11 +481,11 @@ export class Softr implements INodeType {
 				const databaseId = this.getNodeParameter('databaseId', i) as string;
 				const tableId = this.getNodeParameter('tableId', i) as string;
 				if (operation === 'create') {
-					response = await createRecord(this, databaseId, tableId, i);
+					response = await createRecord(this, databaseId, tableId, i, items[i]);
 					returnData.push({ json: response.data });
 				} else if (operation === 'update') {
 					let recordId = this.getNodeParameter('recordId', i) as string;
-					response = await updateRecord(this, databaseId, tableId, recordId, i);
+					response = await updateRecord(this, databaseId, tableId, recordId, i, items[i]);
 					returnData.push({ json: response.data });
 				} else if (operation === 'delete') {
 					let recordId = this.getNodeParameter('recordId', i) as string;
@@ -536,19 +540,38 @@ async function createRecord(
 	databaseId: string,
 	tableId: string,
 	index: number,
+	item: INodeExecutionData,
 ): Promise<any> {
-	const payload = parseFieldsUi(
-		context.getNodeParameter('fields', index) as {
-			fields: { key: string; value: unknown }[];
-		},
-	);
+	let fields = context.getNodeParameter('fields', index) as {
+		value: any;
+		schema: any[];
+		mappingMode: string;
+	};
+	let data =
+		fields.mappingMode === 'autoMapInputData'
+			? filterFields(item.json, fields.schema)
+			: fields.value;
+
+	const payload = { fields: data };
+
 	return context.helpers.requestWithAuthentication.call(context, 'softrApi', {
 		method: 'POST',
 		url: `${SOFTR_TABLES}/databases/${databaseId}/tables/${tableId}/records`,
 		headers: { 'Content-Type': 'application/json' },
-		body: { fields: payload },
+		body: payload,
 		json: true,
 	});
+}
+
+export function filterFields(previous: any, schema: any[]) {
+	const payload: Record<string, any> = {};
+	for (const field of schema) {
+		const fieldId = field.id;
+		if (previous.fields.hasOwnProperty(fieldId)) {
+			payload[fieldId] = previous.fields[fieldId];
+		}
+	}
+	return payload;
 }
 
 async function updateRecord(
@@ -557,18 +580,25 @@ async function updateRecord(
 	tableId: string,
 	recordId: string,
 	index: number,
+	item: INodeExecutionData,
 ): Promise<any> {
-	const payload = parseFieldsUi(
-		context.getNodeParameter('fields', index) as {
-			fields: { key: string; value: unknown }[];
-		},
-	);
+	let fields = context.getNodeParameter('fields', index) as {
+		value: any;
+		schema: any[];
+		mappingMode: string;
+	};
+	let data =
+		fields.mappingMode === 'autoMapInputData'
+			? filterFields(item.json, fields.schema)
+			: fields.value;
+
+	const payload = { fields: data };
 
 	return await context.helpers.requestWithAuthentication.call(context, 'softrApi', {
-		method: 'PUT',
+		method: 'PATCH',
 		url: `${SOFTR_TABLES}/databases/${databaseId}/tables/${tableId}/records/${recordId}`,
 		headers: { 'Content-Type': 'application/json' },
-		body: { fields: payload },
+		body: payload,
 		json: true,
 	});
 }
@@ -691,14 +721,6 @@ async function getPrimaryField(
 	return responseData.data.primaryFieldId;
 }
 
-function parseFieldsUi(rows: any): Record<string, unknown> {
-	return Object.fromEntries(
-		(rows?.fields ?? [])
-			.filter(({ key }: any) => key) // skip empty keys
-			.map(({ key, value }: any) => [key, value]),
-	);
-}
-
 async function getTableFields(
 	this: ILoadOptionsFunctions,
 ): Promise<{ name: string; value: string }[]> {
@@ -717,4 +739,37 @@ async function getTableFields(
 		name: field.name,
 		value: field.id,
 	}));
+}
+
+export async function getColumns(this: ILoadOptionsFunctions): Promise<ResourceMapperFields> {
+	const databaseId = this.getNodeParameter('databaseId') as string;
+	const tableId = this.getNodeParameter('tableId') as string;
+
+	const response = await this.helpers.requestWithAuthentication.call(this, 'softrApi', {
+		method: 'GET',
+		url: `${SOFTR_TABLES}/databases/${databaseId}/tables/${tableId}`,
+		json: true,
+	});
+
+	const fields = (response.data?.fields ?? []) as any[];
+
+	return {
+		fields: fields
+			.filter((field) => !field.readonly)
+			.map((field) => {
+				let displayName = `${field.name} (#${field.id}) - ${field.type}`;
+				let type = 'string';
+				if (field.allowMultipleEntries && field.type !== 'ATTACHMENT') {
+					type = 'array';
+				}
+				return {
+					id: field.id,
+					displayName: displayName,
+					defaultMatch: false,
+					required: field.required ?? false,
+					display: true,
+					type: type,
+				} as ResourceMapperField;
+			}),
+	};
 }
