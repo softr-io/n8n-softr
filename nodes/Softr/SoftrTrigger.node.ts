@@ -164,7 +164,7 @@ export class SoftrTrigger implements INodeType {
 // get max created_at / updated_at timestamp from the records
 function getMaxTimestamp(data: any[], eventType: string): number {
 	// response fields are formated in camelCase
-	const field = eventType == 'created' ? 'createdAt' : 'updatedAt';
+	const field = eventType === 'created' ? 'createdAt' : 'updatedAt';
 	// get max ISO timestamp from the records and format to milliseconds
 	return Math.max(...data.map((r) => new Date(r[field]).getTime()));
 }
