@@ -622,7 +622,7 @@ async function deleteRecord(
 		return successResponse;
 	} catch (error: any) {
 		const statusCode = error?.httpCode || error?.statusCode || error?.response?.statusCode;
-		if (statusCode == 404) {
+		if (Number(statusCode) === 404) {
 			// Idempotent success
 			return successResponse;
 		}
@@ -643,7 +643,7 @@ async function deleteAppUser(context: IExecuteFunctions, index: number): Promise
 		await context.helpers.requestWithAuthentication.call(context, 'softrApi', payload);
 	} catch (error: any) {
 		const statusCode = error?.httpCode || error?.statusCode || error?.response?.statusCode;
-		if (statusCode == 404) {
+		if (Number(statusCode) === 404) {
 			// Idempotent success
 			return successResponse;
 		}

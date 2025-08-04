@@ -153,7 +153,7 @@ export class SoftrTrigger implements INodeType {
 		const response = await this.helpers.requestWithAuthentication.call(this, 'softrApi', request);
 
 		// Update lastTimeChecked with the maximum timestamp from the records
-		if (this.getMode() != 'manual' && response.data.length > 0) {
+		if (this.getMode() !== 'manual' && response.data.length > 0) {
 			staticData.lastTimeChecked = getMaxTimestamp(response.data, eventType);
 		}
 
