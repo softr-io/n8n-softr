@@ -1,6 +1,5 @@
 import {
 	IDataObject,
-	ILoadOptionsFunctions,
 	INodeExecutionData,
 	INodeType,
 	INodeTypeDescription,
@@ -8,7 +7,7 @@ import {
 	IRequestOptions,
 	NodeConnectionType,
 } from 'n8n-workflow';
-import { getDatabases, getTables, SOFTR_TABLES } from './softr.helpers';
+import { SOFTR_TABLES } from './index';
 
 export class SoftrTrigger implements INodeType {
 	description: INodeTypeDescription = {
@@ -95,17 +94,18 @@ export class SoftrTrigger implements INodeType {
 
 	methods = {
 		loadOptions: {
-			async getDatabases(this: ILoadOptionsFunctions) {
-				return getDatabases.call(this);
-			},
-
-			async getTables(this: ILoadOptionsFunctions) {
-				const databaseId = this.getNodeParameter('databaseId', '') as string;
-				if (!databaseId) {
-					return [];
-				}
-				return getTables.call(this, databaseId);
-			},
+			// async getDatabases(this: ILoadOptionsFunctions) {
+			// 	// TODO-Darek:  fix
+			// 	return getDatabases.call(this);
+			// },
+			//
+			// async getTables(this: ILoadOptionsFunctions) {
+			// 	const databaseId = this.getNodeParameter('databaseId', '') as string;
+			// 	if (!databaseId) {
+			// 		return [];
+			// 	}
+			// 	return getTables.call(this, databaseId);
+			// },
 		},
 	};
 

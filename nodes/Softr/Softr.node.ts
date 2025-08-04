@@ -1,7 +1,9 @@
 import {
+	IDataObject,
 	IExecuteFunctions,
 	ILoadOptionsFunctions,
 	INodeExecutionData,
+	INodeListSearchResult,
 	INodeType,
 	INodeTypeDescription,
 	IRequestOptions,
@@ -10,7 +12,7 @@ import {
 	ResourceMapperField,
 	ResourceMapperFields,
 } from 'n8n-workflow';
-import { getDatabases, getTables, SOFTR_STUDIO_USERS, SOFTR_TABLES } from './softr.helpers';
+import { apiRequest, SOFTR_STUDIO_USERS, SOFTR_TABLES } from './index';
 
 export class Softr implements INodeType {
 	description: INodeTypeDescription = {
@@ -125,39 +127,118 @@ export class Softr implements INodeType {
 				default: 'createAppUser',
 			},
 			{
-				displayName: 'Database Name or ID',
+				displayName: 'Database',
 				name: 'databaseId',
-				type: 'options',
-				description:
-					'Choose from the list, or specify an ID using an <a href="https://docs.n8n.io/code/expressions/">expression</a>',
-				typeOptions: {
-					loadOptionsMethod: 'getDatabases',
-				},
+				type: 'resourceLocator',
+				default: { mode: 'list', value: '' },
+				required: true,
+				modes: [
+					{
+						displayName: 'From List',
+						name: 'list',
+						type: 'list',
+						typeOptions: {
+							searchListMethod: 'searchDatabases',
+							searchable: true,
+						},
+					},
+					{
+						displayName: 'By URL',
+						name: 'url',
+						type: 'string',
+						hint: 'Enter a URL',
+						validation: [
+							{
+								type: 'regex',
+								properties: {
+									regex: '^https://studio\\.softr\\.io/databases/[a-f0-9-]+(\\?.*)?$',
+									errorMessage: 'Invalid URL',
+								},
+							},
+						],
+						placeholder: 'https://studio.softr.io/databases/1eb6781b-dbbf-4757-863c-6ac9be52f3d3',
+						// How to get the ID from the URL
+						extractValue: {
+							type: 'regex',
+							regex: '^https://studio\\.softr\\.io/databases/([a-f0-9-]+)',
+						},
+					},
+					{
+						displayName: 'ID',
+						name: 'id',
+						type: 'string',
+						hint: 'Enter an ID',
+						placeholder: '1eb6781b-dbbf-4757-863c-6ac9be52f3d3',
+						url: '=https://studio.softr.io/databases/{{$value}}',
+					},
+				],
 				displayOptions: {
 					show: {
 						resource: ['database'],
 					},
 				},
-				default: '',
-				required: true,
 			},
 			{
-				displayName: 'Table Name or ID',
+				displayName: 'Table',
 				name: 'tableId',
-				type: 'options',
-				description:
-					'Choose from the list, or specify an ID using an <a href="https://docs.n8n.io/code/expressions/">expression</a>',
+				type: 'resourceLocator',
+				default: { mode: 'list', value: '' },
+				required: true,
 				typeOptions: {
-					loadOptionsMethod: 'getTables',
 					loadOptionsDependsOn: ['databaseId'],
 				},
+				modes: [
+					{
+						displayName: 'From List',
+						name: 'list',
+						type: 'list',
+						typeOptions: {
+							searchListMethod: 'searchTables',
+							searchable: true,
+						},
+					},
+					{
+						displayName: 'By URL',
+						name: 'url',
+						type: 'string',
+						placeholder: 'https://studio.softr.io/databases/...?...&table=HamBuoPnm0UMGw',
+						hint: 'Enter a URL',
+						validation: [
+							{
+								type: 'regex',
+								properties: {
+									regex: '[?&]table=[a-zA-Z0-9]+',
+									errorMessage: 'URL must contain a valid table ID in the "table" query parameter',
+								},
+							},
+						],
+						extractValue: {
+							type: 'regex',
+							regex: '[?&]table=([a-zA-Z0-9]+)',
+						},
+					},
+					{
+						displayName: 'ID',
+						name: 'id',
+						type: 'string',
+						hint: 'Enter an ID',
+						placeholder: 'HamBuoPnm0UMGw',
+						validation: [
+							{
+								type: 'regex',
+								properties: {
+									regex: '^[a-zA-Z0-9]+$',
+									errorMessage: 'Table ID must be alphanumeric',
+								},
+							},
+						],
+					},
+				],
 				displayOptions: {
 					show: {
 						resource: ['database'],
 					},
 				},
-				default: '',
-				required: true,
 			},
 			{
 				displayName: 'Record Name or ID',
@@ -416,6 +497,17 @@ export class Softr implements INodeType {
 	};
 
 	methods = {
+		listSearch: {
+			async searchDatabases(this: ILoadOptionsFunctions): Promise<INodeListSearchResult> {
+				return searchDatabases.call(this);
+			},
+
+			async searchTables(this: ILoadOptionsFunctions): Promise<INodeListSearchResult> {
+				const { value: databaseId } = this.getNodeParameter('databaseId') as { value: string };
+				return searchTables.call(this, databaseId);
+			},
+		},
+
 		resourceMapping: {
 			async getColumns(this: ILoadOptionsFunctions): Promise<ResourceMapperFields> {
 				return getColumns.call(this);
@@ -423,15 +515,6 @@ export class Softr implements INodeType {
 		},
 
 		loadOptions: {
-			async getDatabases(this: ILoadOptionsFunctions) {
-				return getDatabases.call(this);
-			},
-
-			async getTables(this: ILoadOptionsFunctions) {
-				const databaseId = this.getNodeParameter('databaseId') as string;
-				return getTables.call(this, databaseId);
-			},
-
 			async getTableFields(this: ILoadOptionsFunctions) {
 				return getTableFields.call(this);
 			},
@@ -446,8 +529,8 @@ export class Softr implements INodeType {
 			},
 
 			async getRecords(this: ILoadOptionsFunctions) {
-				const databaseId = this.getNodeParameter('databaseId') as string;
-				const tableId = this.getNodeParameter('tableId') as string;
+				const { value: databaseId } = this.getNodeParameter('databaseId') as { value: string };
+				const { value: tableId } = this.getNodeParameter('tableId') as { value: string };
 
 				const primaryFieldId: string = await getPrimaryField(this, databaseId, tableId);
 
@@ -478,8 +561,8 @@ export class Softr implements INodeType {
 
 		for (let i = 0; i < items.length; i++) {
 			if (resource === 'database') {
-				const databaseId = this.getNodeParameter('databaseId', i) as string;
-				const tableId = this.getNodeParameter('tableId', i) as string;
+				const { value: databaseId } = this.getNodeParameter('databaseId', i) as { value: string };
+				const { value: tableId } = this.getNodeParameter('tableId', i) as { value: string };
 				if (operation === 'create') {
 					response = await createRecord(this, databaseId, tableId, i, items[i]);
 					returnData.push({ json: response.data });
@@ -699,13 +782,12 @@ async function getManyRecords(
 		],
 	};
 
-	return await context.helpers.requestWithAuthentication.call(context, 'softrApi', {
-		method: 'POST',
-		url: `${SOFTR_TABLES}/databases/${databaseId}/tables/${tableId}/records/search`,
-		headers: { 'Content-Type': 'application/json' },
-		body: payload,
-		json: true,
-	});
+	return await apiRequest.call(
+		context,
+		'POST',
+		`databases/${databaseId}/tables/${tableId}/records/search`,
+		payload,
+	);
 }
 
 async function getPrimaryField(
@@ -771,5 +853,37 @@ export async function getColumns(this: ILoadOptionsFunctions): Promise<ResourceM
 					type: type,
 				} as ResourceMapperField;
 			}),
+	};
+}
+
+export async function searchDatabases(this: ILoadOptionsFunctions): Promise<INodeListSearchResult> {
+	const response = await apiRequest.call(this, 'GET', 'databases');
+	const data = (response.data ?? []) as IDataObject[];
+
+	return {
+		results: data.map((database: IDataObject) => ({
+			name: database.name as string,
+			value: database.id as string,
+			url: `https://studio.softr.io/databases/${database.id}`,
+		})),
+	};
+}
+
+export async function searchTables(
+	this: ILoadOptionsFunctions,
+	databaseId: string,
+): Promise<INodeListSearchResult> {
+	if (!databaseId) {
+		return { results: [] };
+	}
+	const response = await apiRequest.call(this, 'GET', `databases/${databaseId}/tables`);
+	const data = (response.data ?? []) as IDataObject[];
+
+	return {
+		results: data.map((table: IDataObject) => ({
+			name: table.name as string,
+			value: table.id as string,
+			url: `https://studio.softr.io/databases/${databaseId}?table=${table.id}`,
+		})),
 	};
 }
