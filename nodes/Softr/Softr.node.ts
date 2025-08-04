@@ -567,7 +567,7 @@ export function filterFields(previous: any, schema: any[]) {
 	const payload: Record<string, any> = {};
 	for (const field of schema) {
 		const fieldId = field.id;
-		if (previous.fields.hasOwnProperty(fieldId)) {
+		if (Object.prototype.hasOwnProperty.call(previous.fields, fieldId)) {
 			payload[fieldId] = previous.fields[fieldId];
 		}
 	}
