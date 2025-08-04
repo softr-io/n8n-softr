@@ -6,14 +6,14 @@
     "n8n-community-node-package"
   ],
   "license": "MIT",
-  "homepage": "https://softr.io",
+  "homepage": "https://github.com/softr-io/n8n-softr#readme",
   "author": {
     "name": "Softr",
     "email": "artur@softr.io"
   },
   "repository": {
     "type": "git",
-    "url": "https://github.com/softr.io/n8n-softr.git"
+    "url": "https://github.com/softr-io/n8n-softr.git"
   },
   "engines": {
     "node": ">=20.15"
