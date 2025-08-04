@@ -1,6 +1,6 @@
 {
   "name": "n8n-nodes-softr",
-  "version": "1.0.2",
+  "version": "1.0.1",
   "description": "n8n node package for Softr",
   "keywords": [
     "n8n-community-node-package"
