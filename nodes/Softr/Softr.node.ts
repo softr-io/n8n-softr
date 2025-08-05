@@ -1,18 +1,23 @@
 import {
 	IExecuteFunctions,
-	ILoadOptionsFunctions,
 	INodeExecutionData,
 	INodeType,
 	INodeTypeDescription,
-	IRequestOptions,
-	NodeApiError,
 	NodeConnectionType,
-	ResourceMapperField,
-	ResourceMapperFields,
 } from 'n8n-workflow';
-import { apiRequest, SOFTR_STUDIO_USERS, SOFTR_TABLES } from './index';
 import { databaseRLC, tableRLC } from './common.descriptions';
-import { searchTables, searchDatabases } from './listSearch';
+import { searchDatabases, searchTables } from './listSearch';
+import { getColumns } from './resourceMapping';
+import { getRecordId, loadDatabaseId, loadTableId } from './helpers';
+import { getRecords, getTableFields, getTableFieldsForSearch } from './loadOptions';
+import {
+	createRecord,
+	deleteRecord,
+	getManyRecords,
+	getSingleRecord,
+	updateRecord,
+} from './database.actions';
+import { createAppUser, deleteAppUser } from './application.actions';
 
 export class Softr implements INodeType {
 	description: INodeTypeDescription = {
@@ -176,26 +181,7 @@ export class Softr implements INodeType {
 				displayOptions: {
 					show: {
 						resource: ['database'],
-						operation: ['create'],
-					},
-				},
-			},
-			{
-				displayName: 'Fields',
-				name: 'fields',
-				type: 'resourceMapper',
-				default: {},
-				typeOptions: {
-					loadOptionsDependsOn: ['databaseId', 'tableId'],
-					resourceMapper: {
-						mode: 'map',
-						resourceMapperMethod: 'getColumns',
-					},
-				},
-				displayOptions: {
-					show: {
-						resource: ['database'],
-						operation: ['update'],
+						operation: ['create', 'update'],
 					},
 				},
 			},
@@ -401,50 +387,15 @@ export class Softr implements INodeType {
 	methods = {
 		listSearch: {
 			searchDatabases,
-			searchTables
+			searchTables,
 		},
-
 		resourceMapping: {
-			async getColumns(this: ILoadOptionsFunctions): Promise<ResourceMapperFields> {
-				return getColumns.call(this);
-			},
+			getColumns,
 		},
-
 		loadOptions: {
-			async getTableFields(this: ILoadOptionsFunctions) {
-				return getTableFields.call(this);
-			},
-
-			async getTableFieldsForSearch(this: ILoadOptionsFunctions) {
-				const fields = await getTableFields.call(this);
-				return [
-					...fields,
-					{ name: 'Created At (System)', value: 'created_at' },
-					{ name: 'Updated At (System)', value: 'updated_at' },
-				];
-			},
-
-			async getRecords(this: ILoadOptionsFunctions) {
-				const databaseId = this.getNodeParameter('databaseId', undefined, {
-					extractValue: true,
-				}) as string;
-				const tableId = this.getNodeParameter('tableId', undefined, {
-					extractValue: true,
-				}) as string;
-
-				const primaryFieldId: string = await getPrimaryField(this, databaseId, tableId);
-
-				const response = await this.helpers.requestWithAuthentication.call(this, 'softrApi', {
-					method: 'GET',
-					url: `${SOFTR_TABLES}/databases/${databaseId}/tables/${tableId}/records`,
-					json: true,
-				});
-
-				return response.data.map((record: any) => ({
-					name: record.fields[primaryFieldId] || record.id,
-					value: record.id,
-				}));
-			},
+			getTableFields,
+			getTableFieldsForSearch,
+			getRecords,
 		},
 	};
 
@@ -461,304 +412,46 @@ export class Softr implements INodeType {
 
 		for (let i = 0; i < items.length; i++) {
 			if (resource === 'database') {
-				const databaseId = this.getNodeParameter('databaseId', 0, undefined, {
-					extractValue: true,
-				}) as string;
-				const tableId = this.getNodeParameter('tableId', 0, undefined, {
-					extractValue: true,
-				}) as string;
+				const databaseId = loadDatabaseId.call(this);
+				const tableId = loadTableId.call(this);
 
 				if (operation === 'create') {
-					response = await createRecord(this, databaseId, tableId, i, items[i]);
+					response = await createRecord.call(this, databaseId, tableId, i, items[i]);
 					returnData.push({ json: response.data });
-				} else if (operation === 'update') {
-					let recordId = this.getNodeParameter('recordId', i) as string;
-					response = await updateRecord(this, databaseId, tableId, recordId, i, items[i]);
+				}
+				if (operation === 'update') {
+					let recordId = getRecordId.call(this, i);
+					response = await updateRecord.call(this, databaseId, tableId, recordId, i, items[i]);
 					returnData.push({ json: response.data });
-				} else if (operation === 'delete') {
-					let recordId = this.getNodeParameter('recordId', i) as string;
-					response = await deleteRecord(this, databaseId, tableId, recordId);
+				}
+				if (operation === 'delete') {
+					let recordId = getRecordId.call(this, i);
+					response = await deleteRecord.call(this, databaseId, tableId, recordId);
 					returnData.push({ json: response });
-				} else if (operation === 'getMany') {
-					response = await getManyRecords(this, databaseId, tableId, i);
+				}
+				if (operation === 'getMany') {
+					response = await getManyRecords.call(this, databaseId, tableId, i);
 					response.data.forEach((record: any) => {
 						returnData.push({ json: record });
 					});
-				} else if (operation === 'getOne') {
-					const recordId = this.getNodeParameter('recordId', i) as string;
-					response = await getSingleRecord(this, databaseId, tableId, recordId);
+				}
+				if (operation === 'getOne') {
+					let recordId = getRecordId.call(this, i);
+					response = await getSingleRecord.call(this, databaseId, tableId, recordId);
 					returnData.push({ json: response.data });
 				}
-			} else if (resource === 'appUser') {
+			}
+			if (resource === 'appUser') {
 				if (operation === 'createAppUser') {
-					let response = await createAppUser(this, i);
+					let response = await createAppUser.call(this, i);
 					returnData.push({ json: response });
-				} else if (operation === 'deleteAppUser') {
-					let response = await deleteAppUser(this, i);
+				}
+				if (operation === 'deleteAppUser') {
+					let response = await deleteAppUser.call(this, i);
 					returnData.push({ json: response });
 				}
 			}
 		}
 		return [this.helpers.returnJsonArray(returnData)];
 	}
-}
-
-async function createAppUser(context: IExecuteFunctions, index: number): Promise<any> {
-	const payload: IRequestOptions = {
-		method: 'POST',
-		url: `${SOFTR_STUDIO_USERS}`,
-		headers: {
-			'Content-Type': 'application/json',
-			'Softr-Domain': context.getNodeParameter('domain', index) as string,
-		},
-		body: {
-			full_name: context.getNodeParameter('fullName', index) as string,
-			email: context.getNodeParameter('email', index) as string,
-			password: context.getNodeParameter('initialPassword', index) as string,
-			generate_magic_link: context.getNodeParameter('magicLink', index) as boolean,
-		},
-		json: true,
-	};
-
-	return context.helpers.requestWithAuthentication.call(context, 'softrApi', payload);
-}
-
-async function createRecord(
-	context: IExecuteFunctions,
-	databaseId: string,
-	tableId: string,
-	index: number,
-	item: INodeExecutionData,
-): Promise<any> {
-	let fields = context.getNodeParameter('fields', index) as {
-		value: any;
-		schema: any[];
-		mappingMode: string;
-	};
-	let data =
-		fields.mappingMode === 'autoMapInputData'
-			? filterFields(item.json, fields.schema)
-			: fields.value;
-
-	const payload = { fields: data };
-
-	return context.helpers.requestWithAuthentication.call(context, 'softrApi', {
-		method: 'POST',
-		url: `${SOFTR_TABLES}/databases/${databaseId}/tables/${tableId}/records`,
-		headers: { 'Content-Type': 'application/json' },
-		body: payload,
-		json: true,
-	});
-}
-
-export function filterFields(previous: any, schema: any[]) {
-	const payload: Record<string, any> = {};
-	for (const field of schema) {
-		const fieldId = field.id;
-		if (Object.prototype.hasOwnProperty.call(previous.fields, fieldId)) {
-			payload[fieldId] = previous.fields[fieldId];
-		}
-	}
-	return payload;
-}
-
-async function updateRecord(
-	context: IExecuteFunctions,
-	databaseId: string,
-	tableId: string,
-	recordId: string,
-	index: number,
-	item: INodeExecutionData,
-): Promise<any> {
-	let fields = context.getNodeParameter('fields', index) as {
-		value: any;
-		schema: any[];
-		mappingMode: string;
-	};
-	let data =
-		fields.mappingMode === 'autoMapInputData'
-			? filterFields(item.json, fields.schema)
-			: fields.value;
-
-	const payload = { fields: data };
-
-	return await context.helpers.requestWithAuthentication.call(context, 'softrApi', {
-		method: 'PATCH',
-		url: `${SOFTR_TABLES}/databases/${databaseId}/tables/${tableId}/records/${recordId}`,
-		headers: { 'Content-Type': 'application/json' },
-		body: payload,
-		json: true,
-	});
-}
-
-async function deleteRecord(
-	context: IExecuteFunctions,
-	databaseId: string,
-	tableId: string,
-	recordId: string,
-): Promise<any> {
-	const successResponse = {
-		success: true,
-		message: `Record ${recordId} deleted successfully.`,
-		recordId,
-	};
-	try {
-		await context.helpers.requestWithAuthentication.call(context, 'softrApi', {
-			method: 'DELETE',
-			url: `${SOFTR_TABLES}/databases/${databaseId}/tables/${tableId}/records/${recordId}`,
-		});
-		return successResponse;
-	} catch (error: any) {
-		const statusCode = error?.httpCode || error?.statusCode || error?.response?.statusCode;
-		if (Number(statusCode) === 404) {
-			// Idempotent success
-			return successResponse;
-		}
-		throw new NodeApiError(context.getNode(), error);
-	}
-}
-
-async function deleteAppUser(context: IExecuteFunctions, index: number): Promise<any> {
-	const successResponse = { success: true, message: `User deleted successfully` };
-	const email = context.getNodeParameter('email', index) as string;
-	const domain = context.getNodeParameter('domain', index) as string;
-	let payload: IRequestOptions = {
-		method: 'DELETE',
-		url: `${SOFTR_STUDIO_USERS}/${email}`,
-		headers: { 'Softr-Domain': domain },
-	};
-	try {
-		await context.helpers.requestWithAuthentication.call(context, 'softrApi', payload);
-	} catch (error: any) {
-		const statusCode = error?.httpCode || error?.statusCode || error?.response?.statusCode;
-		if (Number(statusCode) === 404) {
-			// Idempotent success
-			return successResponse;
-		}
-		throw new NodeApiError(context.getNode(), error);
-	}
-	return successResponse;
-}
-
-async function getSingleRecord(
-	context: IExecuteFunctions,
-	databaseId: string,
-	tableId: string,
-	recordId: string,
-): Promise<any> {
-	return await context.helpers.requestWithAuthentication.call(context, 'softrApi', {
-		method: 'GET',
-		url: `${SOFTR_TABLES}/databases/${databaseId}/tables/${tableId}/records/${recordId}`,
-		json: true,
-	});
-}
-
-async function getManyRecords(
-	context: IExecuteFunctions,
-	databaseId: string,
-	tableId: string,
-	index: number,
-): Promise<any> {
-	const filter = context.getNodeParameter('filter', index) as {
-		condition?: {
-			operator?: string;
-			leftSide?: string;
-			rightSide?: string;
-		};
-	};
-	const paging = context.getNodeParameter('paging', 0) as {
-		offset?: number;
-		limit?: number;
-		sortingField?: string;
-		sortType?: string;
-	};
-
-	const payload = {
-		filter: filter,
-		paging: {
-			offset: paging.offset ?? 0,
-			limit: paging.limit ?? 50,
-		},
-		sorting: [
-			{
-				sortingField: paging.sortingField ?? 'created_at',
-				sortType: paging.sortType ?? 'ASC',
-			},
-		],
-	};
-
-	// throw new ApplicationError(`GET Many with dbId=${databaseId}, tableId=${tableId}, payload: ${JSON.stringify(payload)}`);
-
-	return await apiRequest.call(
-		context,
-		'POST',
-		`databases/${databaseId}/tables/${tableId}/records/search`,
-		payload,
-	);
-}
-
-async function getPrimaryField(
-	context: ILoadOptionsFunctions,
-	databaseId: string,
-	tableId: string,
-): Promise<string> {
-	const responseData = await context.helpers.requestWithAuthentication.call(context, 'softrApi', {
-		method: 'GET',
-		url: `${SOFTR_TABLES}/databases/${databaseId}/tables/${tableId}`,
-		json: true,
-	});
-	return responseData.data.primaryFieldId;
-}
-
-async function getTableFields(
-	this: ILoadOptionsFunctions,
-): Promise<{ name: string; value: string }[]> {
-	const databaseId = this.getNodeParameter('databaseId') as string;
-	const tableId = this.getNodeParameter('tableId') as string;
-
-	const response = await this.helpers.requestWithAuthentication.call(this, 'softrApi', {
-		method: 'GET',
-		url: `${SOFTR_TABLES}/databases/${databaseId}/tables/${tableId}`,
-		json: true,
-	});
-
-	const fields = response.data?.fields ?? [];
-
-	return fields.map((field: any) => ({
-		name: field.name,
-		value: field.id,
-	}));
-}
-
-export async function getColumns(this: ILoadOptionsFunctions): Promise<ResourceMapperFields> {
-	const databaseId = this.getNodeParameter('databaseId') as string;
-	const tableId = this.getNodeParameter('tableId') as string;
-
-	const response = await this.helpers.requestWithAuthentication.call(this, 'softrApi', {
-		method: 'GET',
-		url: `${SOFTR_TABLES}/databases/${databaseId}/tables/${tableId}`,
-		json: true,
-	});
-
-	const fields = (response.data?.fields ?? []) as any[];
-
-	return {
-		fields: fields
-			.filter((field) => !field.readonly)
-			.map((field) => {
-				let displayName = `${field.name} (#${field.id}) - ${field.type}`;
-				let type = 'string';
-				if (field.allowMultipleEntries && field.type !== 'ATTACHMENT') {
-					type = 'array';
-				}
-				return {
-					id: field.id,
-					displayName: displayName,
-					defaultMatch: false,
-					required: field.required ?? false,
-					display: true,
-					type: type,
-				} as ResourceMapperField;
-			}),
-	};
 }

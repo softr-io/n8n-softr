@@ -4,10 +4,9 @@ import {
 	INodeType,
 	INodeTypeDescription,
 	IPollFunctions,
-	IRequestOptions,
 	NodeConnectionType,
 } from 'n8n-workflow';
-import { SOFTR_TABLES } from './index';
+import { apiRequest } from './index';
 import { databaseRLC, tableRLC } from './common.descriptions';
 import { searchDatabases, searchTables } from './listSearch';
 
@@ -76,13 +75,15 @@ export class SoftrTrigger implements INodeType {
 	methods = {
 		listSearch: {
 			searchDatabases,
-			searchTables
+			searchTables,
 		},
 	};
 
 	async poll(this: IPollFunctions): Promise<INodeExecutionData[][]> {
-		const databaseId = this.getNodeParameter('databaseId', undefined, { extractValue: true, }) as string
-		const tableId = this.getNodeParameter('tableId', undefined, { extractValue: true, }) as string
+		const databaseId = this.getNodeParameter('databaseId', undefined, {
+			extractValue: true,
+		}) as string;
+		const tableId = this.getNodeParameter('tableId', undefined, { extractValue: true }) as string;
 		const eventType = this.getNodeParameter('eventType') as 'created' | 'updated';
 
 		// read static data
@@ -114,14 +115,12 @@ export class SoftrTrigger implements INodeType {
 			};
 		}
 
-		let request: IRequestOptions = {
-			method: 'POST',
-			url: `${SOFTR_TABLES}/databases/${databaseId}/tables/${tableId}/records/search`,
-			headers: { 'Content-Type': 'application/json' },
-			body: payload,
-			json: true,
-		};
-		const response = await this.helpers.requestWithAuthentication.call(this, 'softrApi', request);
+		const response = await apiRequest.call(
+			this,
+			'POST',
+			`databases/${databaseId}/tables/${tableId}/records/search`,
+			payload,
+		);
 
 		// Update lastTimeChecked with the maximum timestamp from the records
 		if (this.getMode() !== 'manual' && response.data.length > 0) {

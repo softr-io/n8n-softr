@@ -7,9 +7,6 @@ import {
 	IRequestOptions,
 } from 'n8n-workflow';
 
-export const SOFTR_TABLES = 'https://tables-api.softr.io/api/v1';
-export const SOFTR_STUDIO_USERS = 'https://studio-api.softr.io/v1/api/users';
-
 export async function apiRequest(
 	this: IExecuteFunctions | IPollFunctions | ILoadOptionsFunctions,
 	method: IHttpRequestMethods,
@@ -37,7 +34,8 @@ export async function apiRequest(
 	if (Object.keys(body).length === 0) {
 		delete options.body;
 	} else {
-		options.headers = {'Content-Type': 'application/json'};
+		options.headers = { 'Content-Type': 'application/json' };
 	}
+
 	return await this.helpers.requestWithAuthentication.call(this, 'softrApi', options);
 }

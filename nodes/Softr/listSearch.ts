@@ -1,5 +1,6 @@
 import { IDataObject, ILoadOptionsFunctions, INodeListSearchResult } from 'n8n-workflow';
 import { apiRequest } from './index';
+import { getDatabaseId } from './helpers';
 
 export async function searchDatabases(this: ILoadOptionsFunctions): Promise<INodeListSearchResult> {
 	const response = await apiRequest.call(this, 'GET', 'databases');
@@ -15,9 +16,7 @@ export async function searchDatabases(this: ILoadOptionsFunctions): Promise<INod
 }
 
 export async function searchTables(this: ILoadOptionsFunctions): Promise<INodeListSearchResult> {
-	const databaseId = this.getNodeParameter('databaseId', undefined, {
-		extractValue: true,
-	}) as string;
+	const databaseId = getDatabaseId.call(this);
 	if (!databaseId) {
 		return { results: [] };
 	}
