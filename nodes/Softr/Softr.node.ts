@@ -9,7 +9,7 @@ import { databaseRLC, tableRLC } from './common.descriptions';
 import { searchDatabases, searchTables } from './listSearch';
 import { getColumns } from './resourceMapping';
 import { getRecordId, loadDatabaseId, loadTableId } from './helpers';
-import { getRecords, getTableFields, getTableFieldsForSearch } from './loadOptions';
+import { getTableFields, getTableFieldsForSearch } from './loadOptions';
 import {
 	createRecord,
 	deleteRecord,
@@ -148,16 +148,11 @@ export class Softr implements INodeType {
 				},
 			},
 			{
-				displayName: 'Record Name or ID',
+				displayName: 'Record ID',
 				name: 'recordId',
-				type: 'options',
+				type: 'string',
 				required: true,
-				description:
-					'Choose from the list, or specify an ID using an <a href="https://docs.n8n.io/code/expressions/">expression</a>',
-				typeOptions: {
-					loadOptionsMethod: 'getRecords',
-					loadOptionsDependsOn: ['databaseId', 'tableId'],
-				},
+				placeholder: 'e.g. AbcD0EFGhIJkLM',
 				default: '',
 				displayOptions: {
 					show: {
@@ -397,7 +392,6 @@ export class Softr implements INodeType {
 		loadOptions: {
 			getTableFields,
 			getTableFieldsForSearch,
-			getRecords,
 		},
 	};
 
