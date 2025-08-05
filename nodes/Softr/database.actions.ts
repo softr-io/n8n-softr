@@ -62,11 +62,7 @@ export async function deleteRecord(
 	tableId: string,
 	recordId: string,
 ): Promise<any> {
-	const successResponse = {
-		success: true,
-		message: `Record ${recordId} deleted successfully.`,
-		recordId,
-	};
+	const successResponse = { deleted: true };
 	try {
 		await apiRequest.call(
 			this,

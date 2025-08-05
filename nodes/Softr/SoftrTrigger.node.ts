@@ -18,7 +18,9 @@ export class SoftrTrigger implements INodeType {
 		group: ['trigger'],
 		version: 1,
 		description: 'Triggers when a Softr record is created or updated',
-		defaults: {},
+		defaults: {
+			name: 'Softr',
+		},
 		credentials: [
 			{
 				name: 'softrApi',

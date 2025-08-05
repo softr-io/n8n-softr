@@ -1,6 +1,7 @@
 import { ILoadOptionsFunctions } from 'n8n-workflow';
 import { apiRequest } from './index';
 import { getDatabaseId, getTableId } from './helpers';
+import { INodePropertyOptions } from 'n8n-workflow/dist/Interfaces';
 
 export async function getTableFieldsForSearch(this: ILoadOptionsFunctions) {
 	const fields = await getTableFields.call(this);
@@ -11,7 +12,7 @@ export async function getTableFieldsForSearch(this: ILoadOptionsFunctions) {
 	];
 }
 
-export async function getRecords(this: ILoadOptionsFunctions) {
+export async function getRecords(this: ILoadOptionsFunctions): Promise<INodePropertyOptions[]> {
 	const databaseId = getDatabaseId.call(this);
 	const tableId = getTableId.call(this);
 
@@ -23,10 +24,13 @@ export async function getRecords(this: ILoadOptionsFunctions) {
 		`databases/${databaseId}/tables/${tableId}/records`,
 	);
 
-	return response.data.map((record: any) => ({
-		name: record.fields[primaryFieldId] || record.id,
-		value: record.id,
-	}));
+	return response.data.map(
+		(record: any) =>
+			({
+				name: record.fields[primaryFieldId] || record.id,
+				value: record.id,
+			}) as INodePropertyOptions,
+	);
 }
 
 export async function getTableFields(

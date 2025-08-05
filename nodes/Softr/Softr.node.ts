@@ -267,6 +267,7 @@ export class Softr implements INodeType {
 					'Either your custom domain (e.g. `www.example.com`) or Softr subdomain (e.g. `subdomain.softr.app`).',
 				type: 'string',
 				default: '',
+				placeholder: 'e.g. www.example.com',
 				required: true,
 				displayOptions: {
 					show: {
@@ -278,7 +279,7 @@ export class Softr implements INodeType {
 				displayName: 'Email',
 				name: 'email',
 				type: 'string',
-				placeholder: 'name@email.com',
+				placeholder: 'e.g. name@email.com',
 				description: 'Email address of the application user to create or delete',
 				default: '',
 				required: true,
@@ -293,6 +294,7 @@ export class Softr implements INodeType {
 				name: 'fullName',
 				description: 'Full Name of the application user to create',
 				type: 'string',
+				placeholder: 'e.g. John Doe',
 				default: '',
 				displayOptions: {
 					show: {

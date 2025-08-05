@@ -24,7 +24,7 @@ export async function createAppUser(this: IExecuteFunctions, index: number): Pro
 }
 
 export async function deleteAppUser(this: IExecuteFunctions, index: number): Promise<any> {
-	const successResponse = { success: true, message: `User deleted successfully` };
+	const successResponse = { deleted: true };
 	const email = this.getNodeParameter('email', index) as string;
 	const domain = getDomain.call(this, index);
 	let payload: IRequestOptions = {
