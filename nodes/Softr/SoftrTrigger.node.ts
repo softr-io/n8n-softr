@@ -8,6 +8,8 @@ import {
 	NodeConnectionType,
 } from 'n8n-workflow';
 import { SOFTR_TABLES } from './index';
+import { databaseRLC, tableRLC } from './common.descriptions';
+import { searchDatabases, searchTables } from './listSearch';
 
 export class SoftrTrigger implements INodeType {
 	description: INodeTypeDescription = {
@@ -28,29 +30,8 @@ export class SoftrTrigger implements INodeType {
 		inputs: [],
 		outputs: [NodeConnectionType.Main],
 		properties: [
-			{
-				displayName: 'Database Name or ID',
-				name: 'databaseId',
-				type: 'options',
-				description:
-					'Choose from the list, or specify an ID using an <a href="https://docs.n8n.io/code/expressions/">expression</a>',
-				typeOptions: {
-					loadOptionsMethod: 'getDatabases',
-				},
-				default: '',
-			},
-			{
-				displayName: 'Table Name or ID',
-				name: 'tableId',
-				type: 'options',
-				description:
-					'Choose from the list, or specify an ID using an <a href="https://docs.n8n.io/code/expressions/">expression</a>',
-				typeOptions: {
-					loadOptionsMethod: 'getTables',
-					loadOptionsDependsOn: ['databaseId'],
-				},
-				default: '',
-			},
+			databaseRLC,
+			tableRLC,
 			{
 				displayName: 'Trigger On',
 				name: 'eventType',
@@ -93,25 +74,15 @@ export class SoftrTrigger implements INodeType {
 	};
 
 	methods = {
-		loadOptions: {
-			// async getDatabases(this: ILoadOptionsFunctions) {
-			// 	// TODO-Darek:  fix
-			// 	return getDatabases.call(this);
-			// },
-			//
-			// async getTables(this: ILoadOptionsFunctions) {
-			// 	const databaseId = this.getNodeParameter('databaseId', '') as string;
-			// 	if (!databaseId) {
-			// 		return [];
-			// 	}
-			// 	return getTables.call(this, databaseId);
-			// },
+		listSearch: {
+			searchDatabases,
+			searchTables
 		},
 	};
 
 	async poll(this: IPollFunctions): Promise<INodeExecutionData[][]> {
-		const databaseId = this.getNodeParameter('databaseId') as string;
-		const tableId = this.getNodeParameter('tableId') as string;
+		const databaseId = this.getNodeParameter('databaseId', undefined, { extractValue: true, }) as string
+		const tableId = this.getNodeParameter('tableId', undefined, { extractValue: true, }) as string
 		const eventType = this.getNodeParameter('eventType') as 'created' | 'updated';
 
 		// read static data
