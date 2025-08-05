@@ -49,8 +49,8 @@ export class Softr implements INodeType {
 					{
 						name: 'Database Record',
 						value: 'database',
-						action: 'Manage records',
-						description: 'Manage Database records',
+						action: 'Manage database records',
+						description: 'Manage database records',
 					},
 					{
 						name: 'Application User',
@@ -75,31 +75,31 @@ export class Softr implements INodeType {
 					{
 						name: 'Create',
 						value: 'create',
-						action: 'Create',
+						action: 'Create record',
 						description: 'Create database record',
 					},
 					{
 						name: 'Delete',
 						value: 'delete',
-						action: 'Delete',
+						action: 'Delete record',
 						description: 'Delete database record',
 					},
 					{
 						name: 'Get Many',
 						value: 'getMany',
-						action: 'Get many',
+						action: 'Get many records',
 						description: 'Get many database records',
 					},
 					{
 						name: 'Get One',
 						value: 'getOne',
-						action: 'Get one',
+						action: 'Get one record',
 						description: 'Get one database record',
 					},
 					{
 						name: 'Update',
 						value: 'update',
-						action: 'Update',
+						action: 'Update record',
 						description: 'Update database record',
 					},
 				],
