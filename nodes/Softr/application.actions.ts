@@ -1,10 +1,10 @@
-import { IExecuteFunctions, IRequestOptions, NodeApiError } from 'n8n-workflow';
+import { IExecuteFunctions, IHttpRequestOptions, NodeApiError } from 'n8n-workflow';
 
 const SOFTR_STUDIO_USERS = 'https://studio-api.softr.io/v1/api/users';
 
 export async function createAppUser(this: IExecuteFunctions, index: number): Promise<any> {
 	const domain = getDomain.call(this, index);
-	const payload: IRequestOptions = {
+	const payload: IHttpRequestOptions = {
 		method: 'POST',
 		url: `${SOFTR_STUDIO_USERS}`,
 		headers: {
@@ -20,20 +20,20 @@ export async function createAppUser(this: IExecuteFunctions, index: number): Pro
 		json: true,
 	};
 
-	return this.helpers.requestWithAuthentication.call(this, 'softrApi', payload);
+	return this.helpers.httpRequestWithAuthentication.call(this, 'softrApi', payload);
 }
 
 export async function deleteAppUser(this: IExecuteFunctions, index: number): Promise<any> {
 	const successResponse = { deleted: true };
 	const email = this.getNodeParameter('email', index) as string;
 	const domain = getDomain.call(this, index);
-	let payload: IRequestOptions = {
+	let payload: IHttpRequestOptions = {
 		method: 'DELETE',
 		url: `${SOFTR_STUDIO_USERS}/${email}`,
 		headers: { 'Softr-Domain': domain },
 	};
 	try {
-		await this.helpers.requestWithAuthentication.call(this, 'softrApi', payload);
+		await this.helpers.httpRequestWithAuthentication.call(this, 'softrApi', payload);
 	} catch (error: any) {
 		const statusCode = error?.httpCode || error?.statusCode || error?.response?.statusCode;
 		if (Number(statusCode) === 404) {

@@ -2,9 +2,9 @@ import {
 	IDataObject,
 	IExecuteFunctions,
 	IHttpRequestMethods,
+	IHttpRequestOptions,
 	ILoadOptionsFunctions,
 	IPollFunctions,
-	IRequestOptions,
 } from 'n8n-workflow';
 
 export async function apiRequest(
@@ -18,13 +18,12 @@ export async function apiRequest(
 ) {
 	query = query || {};
 
-	const options: IRequestOptions = {
+	const options: IHttpRequestOptions = {
 		headers: {} as IDataObject,
 		method,
 		body,
 		qs: query,
-		uri: uri || `https://tables-api.softr.io/api/v1/${endpoint}`,
-		useQuerystring: false,
+		url: uri || `https://tables-api.softr.io/api/v1/${endpoint}`,
 		json: true,
 	};
 
@@ -37,5 +36,5 @@ export async function apiRequest(
 		options.headers = { 'Content-Type': 'application/json' };
 	}
 
-	return await this.helpers.requestWithAuthentication.call(this, 'softrApi', options);
+	return await this.helpers.httpRequestWithAuthentication.call(this, 'softrApi', options);
 }
