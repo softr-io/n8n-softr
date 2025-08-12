@@ -413,41 +413,41 @@ export class Softr implements INodeType {
 
 				if (operation === 'create') {
 					response = await createRecord.call(this, databaseId, tableId, i, items[i]);
-					returnData.push({ json: response.data });
+					returnData.push({ json: response.data, pairedItem: { item: i } });
 				}
 				if (operation === 'update') {
 					let recordId = getRecordId.call(this, i);
 					response = await updateRecord.call(this, databaseId, tableId, recordId, i, items[i]);
-					returnData.push({ json: response.data });
+					returnData.push({ json: response.data, pairedItem: { item: i }  });
 				}
 				if (operation === 'delete') {
 					let recordId = getRecordId.call(this, i);
 					response = await deleteRecord.call(this, databaseId, tableId, recordId);
-					returnData.push({ json: response });
+					returnData.push({ json: response, pairedItem: { item: i }  });
 				}
 				if (operation === 'getMany') {
 					response = await getManyRecords.call(this, databaseId, tableId, i);
 					response.data.forEach((record: any) => {
-						returnData.push({ json: record });
+						returnData.push({ json: record, pairedItem: { item: i }  });
 					});
 				}
 				if (operation === 'getOne') {
 					let recordId = getRecordId.call(this, i);
 					response = await getSingleRecord.call(this, databaseId, tableId, recordId);
-					returnData.push({ json: response.data });
+					returnData.push({ json: response.data, pairedItem: { item: i }  });
 				}
 			}
 			if (resource === 'appUser') {
 				if (operation === 'createAppUser') {
 					let response = await createAppUser.call(this, i);
-					returnData.push({ json: response });
+					returnData.push({ json: response, pairedItem: { item: i }  });
 				}
 				if (operation === 'deleteAppUser') {
 					let response = await deleteAppUser.call(this, i);
-					returnData.push({ json: response });
+					returnData.push({ json: response, pairedItem: { item: i }  });
 				}
 			}
 		}
-		return [this.helpers.returnJsonArray(returnData)];
+		return [returnData];
 	}
 }
