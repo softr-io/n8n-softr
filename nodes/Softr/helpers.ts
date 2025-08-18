@@ -1,6 +1,6 @@
-import { IExecuteFunctions, ILoadOptionsFunctions } from 'n8n-workflow';
+import { IExecuteFunctions, ILoadOptionsFunctions, IPollFunctions } from 'n8n-workflow';
 
-export function getDatabaseId(this: ILoadOptionsFunctions): string {
+export function getDatabaseId(this: ILoadOptionsFunctions | IPollFunctions): string {
 	return this.getNodeParameter('databaseId', undefined, { extractValue: true, }) as string;
 }
 
@@ -8,7 +8,7 @@ export function loadDatabaseId(this: IExecuteFunctions): string {
 	return this.getNodeParameter('databaseId', 0, undefined, { extractValue: true, }) as string;
 }
 
-export function getTableId(this: ILoadOptionsFunctions): string {
+export function getTableId(this: ILoadOptionsFunctions | IPollFunctions): string {
 	return this.getNodeParameter('tableId', undefined, {
 		extractValue: true,
 	}) as string;

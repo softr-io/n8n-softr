@@ -55,7 +55,7 @@ export const tableRLC: INodeProperties = {
 	default: { mode: 'list', value: '' },
 	required: true,
 	typeOptions: {
-		loadOptionsDependsOn: ['databaseId'],
+		loadOptionsDependsOn: ['databaseId.value'],
 	},
 	modes: [
 		{

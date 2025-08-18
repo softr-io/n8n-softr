@@ -1,5 +1,12 @@
-import { IExecuteFunctions, INodeExecutionData, NodeApiError } from 'n8n-workflow';
+import {
+	IExecuteFunctions,
+	INodeExecutionData,
+	IPollFunctions,
+	NodeApiError,
+	ResourceMapperFields,
+} from 'n8n-workflow';
 import { apiRequest } from './index';
+import { getAllColumns } from './resourceMapping';
 
 export async function createRecord(
 	this: IExecuteFunctions,
@@ -20,12 +27,14 @@ export async function createRecord(
 
 	const payload = { fields: data };
 
-	return await apiRequest.call(
+	let rawRecord = await apiRequest.call(
 		this,
 		'POST',
 		`databases/${databaseId}/tables/${tableId}/records`,
 		payload,
 	);
+	const fieldMap = await getFieldsMap.call(this, databaseId, tableId);
+	return mapToFriendlyColumnsNames(rawRecord.data, fieldMap);
 }
 
 export async function updateRecord(
@@ -48,12 +57,14 @@ export async function updateRecord(
 
 	const payload = { fields: data };
 
-	return await apiRequest.call(
+	let rawRecord = await apiRequest.call(
 		this,
 		'PATCH',
 		`databases/${databaseId}/tables/${tableId}/records/${recordId}`,
 		payload,
 	);
+	const fieldMap = await getFieldsMap.call(this, databaseId, tableId);
+	return mapToFriendlyColumnsNames(rawRecord.data, fieldMap);
 }
 
 export async function deleteRecord(
@@ -86,11 +97,13 @@ export async function getSingleRecord(
 	tableId: string,
 	recordId: string,
 ): Promise<any> {
-	return await apiRequest.call(
+	let rawRecord = await apiRequest.call(
 		this,
 		'GET',
 		`databases/${databaseId}/tables/${tableId}/records/${recordId}`,
 	);
+	const fieldMap = await getFieldsMap.call(this, databaseId, tableId);
+	return mapToFriendlyColumnsNames(rawRecord.data, fieldMap);
 }
 
 export async function getManyRecords(
@@ -99,13 +112,22 @@ export async function getManyRecords(
 	tableId: string,
 	index: number,
 ): Promise<any> {
-	const filter = this.getNodeParameter('filter', index) as {
+	const rawFilter = this.getNodeParameter('filter', index) as {
 		condition?: {
-			operator?: string;
-			leftSide?: string;
-			rightSide?: string;
+			operator?: 'AND' | 'OR';
+			conditions?: {
+				condition?: Array<{
+					leftSide: string;
+					operator: string;
+					rightSide?: string;
+				}>;
+			};
 		};
 	};
+
+	const operator = rawFilter.condition?.operator ?? 'AND';
+	const rawConditions = rawFilter.condition?.conditions?.condition ?? [];
+
 	const paging = this.getNodeParameter('paging', 0) as {
 		offset?: number;
 		limit?: number;
@@ -114,7 +136,12 @@ export async function getManyRecords(
 	};
 
 	const payload = {
-		filter: filter,
+		filter: {
+			condition: {
+				operator,
+				conditions: rawConditions,
+			},
+		},
 		paging: {
 			offset: paging.offset ?? 0,
 			limit: paging.limit ?? 50,
@@ -127,12 +154,19 @@ export async function getManyRecords(
 		],
 	};
 
-	return await apiRequest.call(
+	let rawRecords = await apiRequest.call(
 		this,
 		'POST',
 		`databases/${databaseId}/tables/${tableId}/records/search`,
 		payload,
 	);
+
+	const fieldMap = await getFieldsMap.call(this, databaseId, tableId);
+
+	// Transform each record
+	return (rawRecords.data || []).map((record: any) => {
+		return mapToFriendlyColumnsNames(record, fieldMap);
+	});
 }
 
 function filterFields(previous: any, schema: any[]) {
@@ -144,4 +178,35 @@ function filterFields(previous: any, schema: any[]) {
 		}
 	}
 	return payload;
+}
+
+// Gets the field metadata for a given table in a database: field ID -> field label
+export async function getFieldsMap(
+	this: IExecuteFunctions | IPollFunctions,
+	databaseId: string,
+	tableId: string,
+) {
+	const columns: ResourceMapperFields = await getAllColumns.call(this, databaseId, tableId);
+	// Build ID → label map
+	const fieldMap: Record<string, string> = {};
+	(columns.fields || []).forEach((field) => {
+		fieldMap[field.id] = field.displayName || field.id;
+	});
+	return fieldMap;
+}
+
+export function mapToFriendlyColumnsNames(record: any, fieldMap: Record<string, string>) {
+	const friendlyFields: Record<string, any> = {};
+
+	for (const [fieldId, value] of Object.entries(record.fields || {})) {
+		const label = fieldMap[fieldId] || fieldId;
+		friendlyFields[label] = value;
+	}
+
+	return {
+		id: record.id,
+		createdAt: record.createdAt,
+		updatedAt: record.updatedAt,
+		...friendlyFields,
+	};
 }

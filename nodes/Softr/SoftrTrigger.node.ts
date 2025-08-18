@@ -9,6 +9,8 @@ import {
 import { apiRequest } from './index';
 import { databaseRLC, tableRLC } from './common.descriptions';
 import { searchDatabases, searchTables } from './listSearch';
+import { getDatabaseId, getTableId } from './helpers';
+import { getFieldsMap, mapToFriendlyColumnsNames } from './database.actions';
 
 export class SoftrTrigger implements INodeType {
 	description: INodeTypeDescription = {
@@ -82,10 +84,8 @@ export class SoftrTrigger implements INodeType {
 	};
 
 	async poll(this: IPollFunctions): Promise<INodeExecutionData[][]> {
-		const databaseId = this.getNodeParameter('databaseId', undefined, {
-			extractValue: true,
-		}) as string;
-		const tableId = this.getNodeParameter('tableId', undefined, { extractValue: true }) as string;
+		const databaseId = getDatabaseId.call(this);
+		const tableId = getTableId.call(this);
 		const eventType = this.getNodeParameter('eventType') as 'created' | 'updated';
 
 		// read static data
@@ -117,19 +117,14 @@ export class SoftrTrigger implements INodeType {
 			};
 		}
 
-		const response = await apiRequest.call(
-			this,
-			'POST',
-			`databases/${databaseId}/tables/${tableId}/records/search`,
-			payload,
-		);
+		const response = await pollRecords.call(this, databaseId, tableId, payload);
 
 		// Update lastTimeChecked with the maximum timestamp from the records
 		if (this.getMode() !== 'manual' && response.data.length > 0) {
 			staticData.lastTimeChecked = getMaxTimestamp(response.data, eventType);
 		}
 
-		return [this.helpers.returnJsonArray(response.data)];
+		return [this.helpers.returnJsonArray(response)];
 	}
 }
 
@@ -139,4 +134,25 @@ function getMaxTimestamp(data: any[], eventType: string): number {
 	const field = eventType === 'created' ? 'createdAt' : 'updatedAt';
 	// get max ISO timestamp from the records and format to milliseconds
 	return Math.max(...data.map((r) => new Date(r[field]).getTime()));
+}
+
+async function pollRecords(
+	this: IPollFunctions,
+	databaseId: string,
+	tableId: string,
+	payload: any,
+): Promise<any> {
+	let rawRecords = await apiRequest.call(
+		this,
+		'POST',
+		`databases/${databaseId}/tables/${tableId}/records/search`,
+		payload,
+	);
+
+	const fieldMap = await getFieldsMap.call(this, databaseId, tableId);
+
+	// Transform each record
+	return (rawRecords.data || []).map((record: any) => {
+		return mapToFriendlyColumnsNames(record, fieldMap);
+	});
 }

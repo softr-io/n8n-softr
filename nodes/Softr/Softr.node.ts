@@ -167,7 +167,7 @@ export class Softr implements INodeType {
 				type: 'resourceMapper',
 				default: {},
 				typeOptions: {
-					loadOptionsDependsOn: ['databaseId', 'tableId'],
+					loadOptionsDependsOn: ['databaseId.value', 'tableId.value'],
 					resourceMapper: {
 						mode: 'add',
 						resourceMapperMethod: 'getColumns',
@@ -196,54 +196,83 @@ export class Softr implements INodeType {
 						displayName: 'Condition',
 						values: [
 							{
-								displayName: 'Field Name or ID',
-								name: 'leftSide',
-								type: 'options',
-								description:
-									'Choose from the list, or specify an ID using an <a href="https://docs.n8n.io/code/expressions/">expression</a>',
-								typeOptions: {
-									loadOptionsMethod: 'getTableFields',
-									loadOptionsDependsOn: ['databaseId', 'tableId'],
-								},
-								default: '',
-							},
-							{
 								displayName: 'Operator',
-								default: 'IS',
 								name: 'operator',
-								options: [
-									{ name: 'Contains', value: 'CONTAINS' },
-									{ name: 'Does Not Contain', value: 'DOES_NOT_CONTAIN' },
-									{ name: 'Equals', value: 'IS' },
-									{ name: 'Greater Than', value: 'GREATER_THAN' },
-									{ name: 'Greater Than Or Equals', value: 'GREATER_THAN_OR_EQUALS' },
-									{ name: 'Is Empty', value: 'IS_EMPTY' },
-									{ name: 'Is Not Empty', value: 'IS_NOT_EMPTY' },
-									{ name: 'Less Than', value: 'LESS_THAN' },
-									{ name: 'Less Than Or Equals', value: 'LESS_THAN_OR_EQUALS' },
-									{ name: 'Not Equals', value: 'IS_NOT' },
-								],
 								type: 'options',
+								default: 'OR',
+								options: [
+									{ name: 'AND', value: 'AND' },
+									{ name: 'OR', value: 'OR' },
+								],
 							},
 							{
-								displayName: 'Value',
-								name: 'rightSide',
-								type: 'string',
-								default: '',
-								displayOptions: {
-									show: {
-										operator: [
-											'CONTAINS',
-											'DOES_NOT_CONTAIN',
-											'IS',
-											'IS_NOT',
-											'GREATER_THAN',
-											'GREATER_THAN_OR_EQUALS',
-											'LESS_THAN',
-											'LESS_THAN_OR_EQUALS',
+								displayName: 'Conditions',
+								name: 'conditions',
+								type: 'fixedCollection',
+								typeOptions: {
+									multipleValues: true,
+								},
+								default: {
+									parameters: [],
+								},
+								options: [
+									{
+										name: 'condition',
+										displayName: 'Condition',
+										values: [
+											{
+												displayName: 'Field Name or ID',
+												name: 'leftSide',
+												type: 'options',
+												description:
+													'Choose from the list, or specify an ID using an <a href="https://docs.n8n.io/code/expressions/">expression</a>',
+												typeOptions: {
+													loadOptionsMethod: 'getTableFields',
+													loadOptionsDependsOn: ['databaseId.value', 'tableId.value'],
+												},
+												default: '',
+											},
+											{
+												displayName: 'Operator',
+												name: 'operator',
+												type: 'options',
+												default: 'IS',
+												options: [
+													{ name: 'Contains', value: 'CONTAINS' },
+													{ name: 'Does Not Contain', value: 'DOES_NOT_CONTAIN' },
+													{ name: 'Equals', value: 'IS' },
+													{ name: 'Greater Than', value: 'GREATER_THAN' },
+													{ name: 'Greater Than Or Equals', value: 'GREATER_THAN_OR_EQUALS' },
+													{ name: 'Is Empty', value: 'IS_EMPTY' },
+													{ name: 'Is Not Empty', value: 'IS_NOT_EMPTY' },
+													{ name: 'Less Than', value: 'LESS_THAN' },
+													{ name: 'Less Than Or Equals', value: 'LESS_THAN_OR_EQUALS' },
+													{ name: 'Not Equals', value: 'IS_NOT' },
+												],
+											},
+											{
+												displayName: 'Value',
+												name: 'rightSide',
+												type: 'string',
+												default: '',
+												displayOptions: {
+													show: {
+														operator: [
+															'CONTAINS',
+															'DOES_NOT_CONTAIN',
+															'IS',
+															'IS_NOT',
+															'GREATER_THAN',
+															'GREATER_THAN_OR_EQUALS',
+															'LESS_THAN',
+															'LESS_THAN_OR_EQUALS',
+														],
+													},
+												},
+											},
 										],
 									},
-								},
+								],
 							},
 						],
 					},
@@ -362,7 +391,7 @@ export class Softr implements INodeType {
 							'Choose from the list, or specify an ID using an <a href="https://docs.n8n.io/code/expressions/">expression</a>',
 						typeOptions: {
 							loadOptionsMethod: 'getTableFieldsForSearch',
-							loadOptionsDependsOn: ['databaseId', 'tableId'],
+							loadOptionsDependsOn: ['databaseId.value', 'tableId.value'],
 						},
 						default: '',
 					},
@@ -413,38 +442,38 @@ export class Softr implements INodeType {
 
 				if (operation === 'create') {
 					response = await createRecord.call(this, databaseId, tableId, i, items[i]);
-					returnData.push({ json: response.data, pairedItem: { item: i } });
+					returnData.push({ json: response, pairedItem: { item: i } });
 				}
 				if (operation === 'update') {
 					let recordId = getRecordId.call(this, i);
 					response = await updateRecord.call(this, databaseId, tableId, recordId, i, items[i]);
-					returnData.push({ json: response.data, pairedItem: { item: i }  });
+					returnData.push({ json: response, pairedItem: { item: i } });
 				}
 				if (operation === 'delete') {
 					let recordId = getRecordId.call(this, i);
 					response = await deleteRecord.call(this, databaseId, tableId, recordId);
-					returnData.push({ json: response, pairedItem: { item: i }  });
+					returnData.push({ json: response, pairedItem: { item: i } });
 				}
 				if (operation === 'getMany') {
 					response = await getManyRecords.call(this, databaseId, tableId, i);
-					response.data.forEach((record: any) => {
-						returnData.push({ json: record, pairedItem: { item: i }  });
+					response.forEach((record: any) => {
+						returnData.push({ json: record, pairedItem: { item: i } });
 					});
 				}
 				if (operation === 'getOne') {
 					let recordId = getRecordId.call(this, i);
 					response = await getSingleRecord.call(this, databaseId, tableId, recordId);
-					returnData.push({ json: response.data, pairedItem: { item: i }  });
+					returnData.push({ json: response, pairedItem: { item: i } });
 				}
 			}
 			if (resource === 'appUser') {
 				if (operation === 'createAppUser') {
 					let response = await createAppUser.call(this, i);
-					returnData.push({ json: response, pairedItem: { item: i }  });
+					returnData.push({ json: response, pairedItem: { item: i } });
 				}
 				if (operation === 'deleteAppUser') {
 					let response = await deleteAppUser.call(this, i);
-					returnData.push({ json: response, pairedItem: { item: i }  });
+					returnData.push({ json: response, pairedItem: { item: i } });
 				}
 			}
 		}
