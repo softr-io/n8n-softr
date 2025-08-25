@@ -20,8 +20,9 @@ export class SoftrTrigger implements INodeType {
 		group: ['trigger'],
 		version: 1,
 		description: 'Triggers when a Softr record is created or updated',
+		subtitle: '={{$parameter["event"]}}',
 		defaults: {
-			name: 'Softr',
+			name: 'Softr Trigger',
 		},
 		credentials: [
 			{
@@ -64,13 +65,12 @@ export class SoftrTrigger implements INodeType {
 			},
 			{
 				displayName: 'Limit',
-				name: 'batchSize',
+				name: 'limit',
 				type: 'number',
 				typeOptions: {
 					minValue: 1,
-					maxValue: 100,
 				},
-				default: 10,
+				default: 50,
 				description: 'Max number of results to return',
 			},
 		],
@@ -83,7 +83,7 @@ export class SoftrTrigger implements INodeType {
 		},
 	};
 
-	async poll(this: IPollFunctions): Promise<INodeExecutionData[][]> {
+	async poll(this: IPollFunctions): Promise<INodeExecutionData[][] | null> {
 		const databaseId = getDatabaseId.call(this);
 		const tableId = getTableId.call(this);
 		const eventType = this.getNodeParameter('eventType') as 'created' | 'updated';
@@ -101,7 +101,7 @@ export class SoftrTrigger implements INodeType {
 		} else {
 			// polling mode
 			const field = eventType === 'created' ? 'created_at' : 'updated_at';
-			const limit = this.getNodeParameter('batchSize') as number;
+			const limit = this.getNodeParameter('limit') as number;
 			const startTime = new Date(this.getNodeParameter('startTime') as string).getTime();
 			const pollingStartTime = (staticData.lastTimeChecked || startTime) as number;
 			payload = {
@@ -113,18 +113,20 @@ export class SoftrTrigger implements INodeType {
 					},
 				},
 				paging: { offset: 0, limit: limit },
-				sorting: [{ sortingField: 'created_at', sortType: 'ASC' }],
+				sorting: [{ sortingField: field, sortType: 'ASC' }],
 			};
 		}
+		const records = await pollRecords.call(this, databaseId, tableId, payload);
 
-		const response = await pollRecords.call(this, databaseId, tableId, payload);
-
-		// Update lastTimeChecked with the maximum timestamp from the records
-		if (this.getMode() !== 'manual' && response.data.length > 0) {
-			staticData.lastTimeChecked = getMaxTimestamp(response.data, eventType);
+		if (Array.isArray(records) && records.length) {
+			// Update lastTimeChecked with the maximum timestamp from the records
+			if (this.getMode() !== 'manual') {
+				staticData.lastTimeChecked = getMaxTimestamp(records, eventType);
+			}
+			return [this.helpers.returnJsonArray(records)];
+		} else {
+			return null;
 		}
-
-		return [this.helpers.returnJsonArray(response)];
 	}
 }
 
