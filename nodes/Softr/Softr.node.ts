@@ -13,6 +13,7 @@ import { getTableFields, getTableFieldsForSearch } from './loadOptions';
 import {
 	createRecord,
 	deleteRecord,
+	getFieldsMap,
 	getManyRecords,
 	getSingleRecord,
 	updateRecord,
@@ -435,18 +436,26 @@ export class Softr implements INodeType {
 			return [];
 		}
 
+		// Pre-fetch field map once for all items to avoid redundant API calls per record
+		let fieldMap: Record<string, string> | undefined;
+		if (resource === 'database') {
+			const databaseId = loadDatabaseId.call(this);
+			const tableId = loadTableId.call(this);
+			fieldMap = await getFieldsMap.call(this, databaseId, tableId);
+		}
+
 		for (let i = 0; i < items.length; i++) {
 			if (resource === 'database') {
 				const databaseId = loadDatabaseId.call(this);
 				const tableId = loadTableId.call(this);
 
 				if (operation === 'create') {
-					response = await createRecord.call(this, databaseId, tableId, i, items[i]);
+					response = await createRecord.call(this, databaseId, tableId, i, items[i], fieldMap);
 					returnData.push({ json: response, pairedItem: { item: i } });
 				}
 				if (operation === 'update') {
 					let recordId = getRecordId.call(this, i);
-					response = await updateRecord.call(this, databaseId, tableId, recordId, i, items[i]);
+					response = await updateRecord.call(this, databaseId, tableId, recordId, i, items[i], fieldMap);
 					returnData.push({ json: response, pairedItem: { item: i } });
 				}
 				if (operation === 'delete') {
@@ -455,14 +464,14 @@ export class Softr implements INodeType {
 					returnData.push({ json: response, pairedItem: { item: i } });
 				}
 				if (operation === 'getMany') {
-					response = await getManyRecords.call(this, databaseId, tableId, i);
+					response = await getManyRecords.call(this, databaseId, tableId, i, fieldMap);
 					response.forEach((record: any) => {
 						returnData.push({ json: record, pairedItem: { item: i } });
 					});
 				}
 				if (operation === 'getOne') {
 					let recordId = getRecordId.call(this, i);
-					response = await getSingleRecord.call(this, databaseId, tableId, recordId);
+					response = await getSingleRecord.call(this, databaseId, tableId, recordId, fieldMap);
 					returnData.push({ json: response, pairedItem: { item: i } });
 				}
 			}
