@@ -2,20 +2,28 @@ import { IDataObject, ILoadOptionsFunctions, INodeListSearchResult } from 'n8n-w
 import { apiRequest } from './index';
 import { getDatabaseId } from './helpers';
 
-export async function searchDatabases(this: ILoadOptionsFunctions): Promise<INodeListSearchResult> {
+export async function searchDatabases(
+	this: ILoadOptionsFunctions,
+	filter?: string,
+): Promise<INodeListSearchResult> {
 	const response = await apiRequest.call(this, 'GET', 'databases');
 	const data = (response.data ?? []) as IDataObject[];
 
 	return {
-		results: data.map((database: IDataObject) => ({
-			name: database.name as string,
-			value: database.id as string,
-			url: `https://studio.softr.io/databases/${database.id}`,
-		})),
+		results: data
+			.filter((db) => !filter || (db.name as string).toLowerCase().includes(filter.toLowerCase()))
+			.map((database: IDataObject) => ({
+				name: database.name as string,
+				value: database.id as string,
+				url: `https://studio.softr.io/databases/${database.id}`,
+			})),
 	};
 }
 
-export async function searchTables(this: ILoadOptionsFunctions): Promise<INodeListSearchResult> {
+export async function searchTables(
+	this: ILoadOptionsFunctions,
+	filter?: string,
+): Promise<INodeListSearchResult> {
 	const databaseId = getDatabaseId.call(this);
 	if (!databaseId) {
 		return { results: [] };
@@ -25,10 +33,12 @@ export async function searchTables(this: ILoadOptionsFunctions): Promise<INodeLi
 	const data = (response.data ?? []) as IDataObject[];
 
 	return {
-		results: data.map((table: IDataObject) => ({
-			name: table.name as string,
-			value: table.id as string,
-			url: `https://studio.softr.io/databases/${databaseId}?table=${table.id}`,
-		})),
+		results: data
+			.filter((t) => !filter || (t.name as string).toLowerCase().includes(filter.toLowerCase()))
+			.map((table: IDataObject) => ({
+				name: table.name as string,
+				value: table.id as string,
+				url: `https://studio.softr.io/databases/${databaseId}?table=${table.id}`,
+			})),
 	};
 }

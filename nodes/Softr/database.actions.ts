@@ -14,6 +14,7 @@ export async function createRecord(
 	tableId: string,
 	index: number,
 	item: INodeExecutionData,
+	fieldMap?: Record<string, string>,
 ): Promise<any> {
 	let fields = this.getNodeParameter('fields', index) as {
 		value: any;
@@ -33,8 +34,8 @@ export async function createRecord(
 		`databases/${databaseId}/tables/${tableId}/records`,
 		payload,
 	);
-	const fieldMap = await getFieldsMap.call(this, databaseId, tableId);
-	return mapToFriendlyColumnsNames(rawRecord.data, fieldMap);
+	const map = fieldMap ?? (await getFieldsMap.call(this, databaseId, tableId));
+	return mapToFriendlyColumnsNames(rawRecord.data, map);
 }
 
 export async function updateRecord(
@@ -44,6 +45,7 @@ export async function updateRecord(
 	recordId: string,
 	index: number,
 	item: INodeExecutionData,
+	fieldMap?: Record<string, string>,
 ): Promise<any> {
 	let fields = this.getNodeParameter('fields', index) as {
 		value: any;
@@ -63,8 +65,8 @@ export async function updateRecord(
 		`databases/${databaseId}/tables/${tableId}/records/${recordId}`,
 		payload,
 	);
-	const fieldMap = await getFieldsMap.call(this, databaseId, tableId);
-	return mapToFriendlyColumnsNames(rawRecord.data, fieldMap);
+	const map = fieldMap ?? (await getFieldsMap.call(this, databaseId, tableId));
+	return mapToFriendlyColumnsNames(rawRecord.data, map);
 }
 
 export async function deleteRecord(
@@ -96,14 +98,15 @@ export async function getSingleRecord(
 	databaseId: string,
 	tableId: string,
 	recordId: string,
+	fieldMap?: Record<string, string>,
 ): Promise<any> {
 	let rawRecord = await apiRequest.call(
 		this,
 		'GET',
 		`databases/${databaseId}/tables/${tableId}/records/${recordId}`,
 	);
-	const fieldMap = await getFieldsMap.call(this, databaseId, tableId);
-	return mapToFriendlyColumnsNames(rawRecord.data, fieldMap);
+	const map = fieldMap ?? (await getFieldsMap.call(this, databaseId, tableId));
+	return mapToFriendlyColumnsNames(rawRecord.data, map);
 }
 
 export async function getManyRecords(
@@ -111,6 +114,7 @@ export async function getManyRecords(
 	databaseId: string,
 	tableId: string,
 	index: number,
+	fieldMap?: Record<string, string>,
 ): Promise<any> {
 	const rawFilter = this.getNodeParameter('filter', index) as {
 		condition?: {
@@ -128,7 +132,7 @@ export async function getManyRecords(
 	const operator = rawFilter.condition?.operator ?? 'AND';
 	const rawConditions = rawFilter.condition?.conditions?.condition ?? [];
 
-	const paging = this.getNodeParameter('paging', 0) as {
+	const paging = this.getNodeParameter('paging', index) as {
 		offset?: number;
 		limit?: number;
 		sortingField?: string;
@@ -161,11 +165,11 @@ export async function getManyRecords(
 		payload,
 	);
 
-	const fieldMap = await getFieldsMap.call(this, databaseId, tableId);
+	const map = fieldMap ?? (await getFieldsMap.call(this, databaseId, tableId));
 
 	// Transform each record
 	return (rawRecords.data || []).map((record: any) => {
-		return mapToFriendlyColumnsNames(record, fieldMap);
+		return mapToFriendlyColumnsNames(record, map);
 	});
 }
 
